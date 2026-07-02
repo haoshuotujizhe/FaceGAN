@@ -1,6 +1,6 @@
 """
-批量生成答辩用的图表素材 — 存到 figures/
-用法: python generate_figures.py
+Generate figures for report/PPT. Output: figures/
+Usage: python scripts/generate_figures.py
 """
 import sys, os
 sys.path.insert(0, 'official')
@@ -49,7 +49,7 @@ for i, a in enumerate(alphas):
     img = G.synthesis(ws + a * gd, noise_mode='const')
     arr = ((img.squeeze(0).permute(1,2,0).cpu()+1)*127.5).clamp(0,255).to(torch.uint8).numpy()
     axes[i].imshow(arr); axes[i].axis('off')
-    axes[i].set_title(f'{"👨" if a<-0.5 else "👩" if a>0.5 else "😐"}α={a:+.0f}')
+    axes[i].set_title(f'{"M" if a<-0.5 else "F" if a>0.5 else "N"} a={a:+.0f}')
 plt.tight_layout(); plt.savefig('figures/02_gender_walk.png', dpi=200); plt.close()
 
 # ─── 3. 多身份对比 6×3 ───
@@ -58,7 +58,7 @@ fig, axes = plt.subplots(6, 3, figsize=(10, 20))
 for pid in range(6):
     torch.manual_seed(pid*17)
     ws = G.mapping(torch.randn(1, G.z_dim, device=device), None, truncation_psi=0.7)
-    for j, (label, a) in enumerate([('♂', -4), ('😐', 0), ('♀', +4)]):
+    for j, (label, a) in enumerate([('M', -4), ('N', 0), ('F', +4)]):
         img = G.synthesis(ws + a * gd, noise_mode='const')
         arr = ((img.squeeze(0).permute(1,2,0).cpu()+1)*127.5).clamp(0,255).to(torch.uint8).numpy()
         axes[pid, j].imshow(arr); axes[pid, j].axis('off')
@@ -107,4 +107,4 @@ ax.annotate('', xy=(6.2, 2.6), xytext=(7, 2.6),
             arrowprops=dict(arrowstyle='->', color='#e65100', lw=1.5, style='dashed'))
 plt.tight_layout(); plt.savefig('figures/05_architecture.png', dpi=200); plt.close()
 
-print(f'\n✅ 全部图表已保存到 figures/ ({len(os.listdir("figures"))} 个文件)')
+print(f'\nAll figures saved to figures/ ({len(os.listdir("figures"))} files)')

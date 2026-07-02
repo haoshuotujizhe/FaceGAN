@@ -1,8 +1,6 @@
 """
-🎭 FaceGAN 演示系统 — Gradio Web 界面
-======================================
-基于: NVIDIA StyleGAN2-ADA (官方) + InterFaceGAN 性别控制
-用法: conda activate pytorch && pip install gradio && python app.py
+FaceGAN — StyleGAN2 Face Generation with Gender Control
+Usage: conda activate pytorch && python app.py
 """
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'official'))
@@ -12,33 +10,32 @@ import numpy as np
 from PIL import Image
 import gradio as gr
 
-# ─── 加载模型 ────────────────────────────────────────────
+# -- Load model -------------------------------------------------
 
 device = 'cuda'
-print('📦 Loading StyleGAN2...')
+print('Loading StyleGAN2-ADA...')
 with dnnlib.util.open_url('weights/ffhq.pkl') as f:
     G = legacy.load_network_pkl(f)['G_ema'].to(device).eval()
 num_ws = G.mapping.num_ws
-print(f'   {G.img_resolution}×{G.img_resolution} | W layers={num_ws}')
+print(f'  {G.img_resolution}x{G.img_resolution}, W layers={num_ws}')
 
 gd_path = 'weights/gender_dir_official.pt'
 if os.path.exists(gd_path):
     gender_dir = torch.load(gd_path, map_location=device)
-    print(f'   Gender direction: loaded ({gender_dir.shape})')
+    print(f'  Gender direction loaded: {gender_dir.shape}')
 else:
     gender_dir = torch.randn(1, num_ws, G.z_dim, device=device)
     gender_dir = gender_dir / gender_dir.norm()
-    print('   WARNING: using random direction')
+    print('  Warning: using random gender direction')
 
-# ─── 生成函数 ────────────────────────────────────────────
+# -- Generation functions ---------------------------------------
 
 @torch.no_grad()
 def generate(seed, gender_alpha, truncation_psi):
-    """核心生成函数 — 先设种子, 再采样"""
     s = int(seed)
     if s >= 0:
         torch.manual_seed(s)
-    z = torch.randn(1, G.z_dim, device=device)  # ← seed 之后才采样!
+    z = torch.randn(1, G.z_dim, device=device)
 
     ws = G.mapping(z, None, truncation_psi=float(truncation_psi))
     if abs(float(gender_alpha)) > 0.01:
@@ -51,12 +48,10 @@ def generate(seed, gender_alpha, truncation_psi):
 
 @torch.no_grad()
 def generate_grid(seed, rows, cols, gender_alpha):
-    """多张 → 拼成网格"""
     imgs = []
     base = int(seed) if seed >= 0 else 42
     for i in range(int(rows) * int(cols)):
-        img = generate(base + i * 100, gender_alpha, 0.7)
-        imgs.append(img)
+        imgs.append(generate(base + i * 100, gender_alpha, 0.7))
     w, h = imgs[0].size
     grid = Image.new('RGB', (w * int(cols), h * int(rows)))
     for i, img in enumerate(imgs):
@@ -67,7 +62,6 @@ def generate_grid(seed, rows, cols, gender_alpha):
 
 @torch.no_grad()
 def gender_walk(seed):
-    """性别渐变: 7 帧拼一行"""
     s = int(seed)
     if s >= 0:
         torch.manual_seed(s)
@@ -89,7 +83,6 @@ def gender_walk(seed):
 
 @torch.no_grad()
 def trunc_grid(seed_val):
-    """截断对比: ψ=0~1.0, 6 帧拼一行"""
     s = int(seed_val)
     if s >= 0:
         torch.manual_seed(s)
@@ -109,7 +102,6 @@ def trunc_grid(seed_val):
 
 
 def export_faces(seed, count):
-    """批量导出"""
     os.makedirs('outputs', exist_ok=True)
     base = int(seed) if seed >= 0 else 0
     paths = []
@@ -118,54 +110,52 @@ def export_faces(seed, count):
         p = f'outputs/face_{i:03d}.png'
         img.save(p)
         paths.append(p)
-    return f'✅ {count} 张 → outputs/', paths[0] if paths else None
+    return f'Saved {count} images to outputs/', paths[0] if paths else None
 
 
-# ─── Gradio UI ────────────────────────────────────────────
+# -- Gradio UI -------------------------------------------------
 
 THEME = gr.themes.Soft(primary_hue="violet")
-DEFAULT_IMG = generate(42, 0, 0.7)  # 初始默认图
+DEFAULT_IMG = generate(42, 0, 0.7)
 
-with gr.Blocks(title="FaceGAN - 人脸生成演示系统", theme=THEME) as demo:
+with gr.Blocks(title="FaceGAN - Face Generation System", theme=THEME) as demo:
     gr.HTML("""
     <div style="text-align:center; margin-bottom:0.5em">
-      <h1>🎭 基于 GAN 的人脸生成系统</h1>
+      <h1>基于 GAN 的人脸生成系统</h1>
       <p style="font-size:15px; color:#666">
-        StyleGAN2-ADA (NVIDIA) + InterFaceGAN 潜空间操控 &nbsp;|&nbsp; 1024×1024 &nbsp;|&nbsp; FFHQ 预训练
+        StyleGAN2-ADA (NVIDIA) + InterFaceGAN 潜空间操控 | 1024x1024 | FFHQ 预训练
       </p>
     </div>
     """)
 
     with gr.Tabs():
-        # ═══════════════ Tab 1: 交互式控制 ═══════════════
-        with gr.Tab("🎛️ 交互式控制"):
+        # Tab 1: Interactive Control
+        with gr.Tab("Interactive"):
             with gr.Row():
                 with gr.Column(scale=1):
-                    gr.Markdown("### ⚙️ 控制面板")
+                    gr.Markdown("### Controls")
                     seed = gr.Slider(-1, 9999, value=42, step=1,
-                                     label="🎲 种子 (-1=随机)")
+                                     label="Seed (-1 = random)")
                     gender = gr.Slider(-5, 5, value=0, step=0.2,
-                                       label="👫 性别 (← 男 &nbsp;&nbsp; 女 →)")
+                                       label="Gender (left=male, right=female)")
                     trunc = gr.Slider(0.0, 1.0, value=0.7, step=0.05,
-                                      label="📐 截断 ψ (质量 ↔ 多样性)")
+                                      label="Truncation psi (quality vs. diversity)")
 
                     with gr.Row():
-                        btn_update = gr.Button("🎨 更新生成", variant="primary", size="lg")
-                        btn_random = gr.Button("🎲 随机", size="sm")
+                        btn_update = gr.Button("Generate", variant="primary", size="lg")
+                        btn_random = gr.Button("Random", size="sm")
 
                     gr.Markdown("---")
-                    gr.Markdown("**快捷预设:**")
+                    gr.Markdown("**Presets:**")
                     with gr.Row():
-                        btn_neutral = gr.Button("😐 中性", size="sm")
-                        btn_male = gr.Button("👨 男性", size="sm")
-                        btn_female = gr.Button("👩 女性", size="sm")
+                        btn_neutral = gr.Button("Neutral", size="sm")
+                        btn_male = gr.Button("Male", size="sm")
+                        btn_female = gr.Button("Female", size="sm")
 
                 with gr.Column(scale=1):
-                    gr.Markdown("### 🖼️ 生成结果")
+                    gr.Markdown("### Result")
                     output_single = gr.Image(value=DEFAULT_IMG, label="")
 
-            # ── 事件绑定 ──
-            # 主按钮: 用当前 slider 值生成
             btn_update.click(generate, [seed, gender, trunc], output_single)
             btn_random.click(
                 lambda: (generate(-1, 0, 0.7), -1, 0, 0.7),
@@ -184,55 +174,55 @@ with gr.Blocks(title="FaceGAN - 人脸生成演示系统", theme=THEME) as demo:
                 None, [output_single, seed, gender, trunc]
             )
 
-        # ═══════════════ Tab 2: 性别渐变 ═══════════════
-        with gr.Tab("🎞️ 性别渐变"):
-            gr.Markdown("### 同一身份: 从男性到女性的连续 Morphing")
+        # Tab 2: Gender Walk
+        with gr.Tab("Gender Walk"):
+            gr.Markdown("### Continuous morphing from male to female")
             with gr.Row():
-                walk_seed = gr.Slider(-1, 9999, value=42, step=1, label="🎲 种子")
-                walk_btn = gr.Button("▶️ 生成渐变", variant="primary")
-            walk_output = gr.Image(label="👈 男 ——————————— 女 👉")
+                walk_seed = gr.Slider(-1, 9999, value=42, step=1, label="Seed")
+                walk_btn = gr.Button("Generate Walk", variant="primary")
+            walk_output = gr.Image(label="Male  ----------  Female")
             walk_btn.click(gender_walk, walk_seed, walk_output)
 
-        # ═══════════════ Tab 3: 批量画廊 ═══════════════
-        with gr.Tab("🖼️ 批量画廊"):
-            gr.Markdown("### 批量随机生成 → 拼成网格")
+        # Tab 3: Gallery
+        with gr.Tab("Gallery"):
+            gr.Markdown("### Random face gallery")
             with gr.Row():
-                grid_seed = gr.Slider(-1, 9999, value=0, step=1, label="种子")
-                grid_alpha = gr.Slider(-5, 5, value=0, step=0.2, label="性别")
-                grid_rows = gr.Slider(1, 4, value=2, step=1, label="行数")
-                grid_cols = gr.Slider(2, 5, value=3, step=1, label="列数")
-            grid_btn = gr.Button("🎲 生成画廊", variant="primary")
+                grid_seed = gr.Slider(-1, 9999, value=0, step=1, label="Seed")
+                grid_alpha = gr.Slider(-5, 5, value=0, step=0.2, label="Gender")
+                grid_rows = gr.Slider(1, 4, value=2, step=1, label="Rows")
+                grid_cols = gr.Slider(2, 5, value=3, step=1, label="Cols")
+            grid_btn = gr.Button("Generate Gallery", variant="primary")
             grid_output = gr.Image(label="")
             grid_btn.click(generate_grid,
                            [grid_seed, grid_rows, grid_cols, grid_alpha],
                            grid_output)
 
-        # ═══════════════ Tab 4: 批量导出 ═══════════════
-        with gr.Tab("💾 批量导出"):
-            gr.Markdown("### 批量生成 → 保存到 `outputs/` 目录")
+        # Tab 4: Export
+        with gr.Tab("Export"):
+            gr.Markdown("### Batch export to outputs/")
             with gr.Row():
-                exp_seed = gr.Slider(-1, 9999, value=0, step=1, label="种子")
-                exp_count = gr.Slider(4, 50, value=12, step=1, label="数量")
-            exp_btn = gr.Button("📥 导出到本地", variant="primary")
-            exp_msg = gr.Textbox(label="状态")
-            exp_preview = gr.Image(label="预览 (第 1 张)")
+                exp_seed = gr.Slider(-1, 9999, value=0, step=1, label="Seed")
+                exp_count = gr.Slider(4, 50, value=12, step=1, label="Count")
+            exp_btn = gr.Button("Export", variant="primary")
+            exp_msg = gr.Textbox(label="Status")
+            exp_preview = gr.Image(label="Preview (first image)")
             exp_btn.click(export_faces, [exp_seed, exp_count],
                           [exp_msg, exp_preview])
 
-        # ═══════════════ Tab 5: 截断分析 ═══════════════
-        with gr.Tab("📐 截断分析"):
-            gr.Markdown("### 截断 ψ 对生成的影响")
-            gr.Markdown("ψ=0 → 平均脸(质量高) &nbsp;|&nbsp; ψ=1 → 完全随机(多样性高)")
+        # Tab 5: Truncation Analysis
+        with gr.Tab("Truncation"):
+            gr.Markdown("### Effect of truncation psi")
+            gr.Markdown("psi=0: average face (high quality) | psi=1: fully random (high diversity)")
             with gr.Row():
-                trunc_seed = gr.Slider(-1, 9999, value=42, step=1, label="种子")
-                trunc_btn = gr.Button("📊 生成对比", variant="primary")
-            trunc_output = gr.Image(label="ψ: 0.0 → 1.0")
+                trunc_seed = gr.Slider(-1, 9999, value=42, step=1, label="Seed")
+                trunc_btn = gr.Button("Generate Comparison", variant="primary")
+            trunc_output = gr.Image(label="psi: 0.0 -> 1.0")
             trunc_btn.click(trunc_grid, trunc_seed, trunc_output)
 
     gr.HTML("""
     <hr>
     <p style="text-align:center; color:#aaa; font-size:11px">
-      FaceGAN | StyleGAN2-ADA (NVIDIA) + InterFaceGAN | FFHQ Pre-trained | PyTorch + Gradio
+      FaceGAN | StyleGAN2-ADA (NVIDIA) + InterFaceGAN | FFHQ | PyTorch + Gradio
     </p>
     """)
 

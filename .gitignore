@@ -1,8 +1,30 @@
+# Model weights (large files)
 weights/*.pkl
 weights/*.pt
-__pycache__/
-.ipynb_checkpoints/
-*.png
+
+# Generated output
 outputs/
-docs/
+figures/
+*.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# Torch extensions cache
+torch_extensions/
+
+# IDE
+.vscode/
+.idea/
 .spec-workflow
+docs
+
+# Conda
+.env/
+
+# macOS
+.DS_Store
+

@@ -82,7 +82,7 @@ class GenderClassifier:
             r.raise_for_status()
             with open(model_path, 'wb') as f:
                 f.write(r.content)
-            print(f"[GenderCls] ✅ 已下载: {model_path}")
+            print(f"[GenderCls] Downloaded: {model_path}")
 
         # 下载 prototxt
         if not os.path.exists(proto_path):
@@ -95,7 +95,7 @@ class GenderClassifier:
             except Exception:
                 # 备选: 直接用内置 prototxt
                 self._write_default_prototxt(proto_path)
-            print(f"[GenderCls] ✅ prototxt 就绪: {proto_path}")
+            print(f"[GenderCls] prototxt ready: {proto_path}")
 
         return model_path, proto_path
 
@@ -191,9 +191,9 @@ layer {
             model_path, proto_path = self._download_model_files(save_dir)
 
             self.model = cv2.dnn.readNetFromCaffe(proto_path, model_path)
-            print(f"[GenderCls] ✅ OpenCV 性别分类器就绪")
+            print(f"[GenderCls] OpenCV gender classifier ready")
         except Exception as e:
-            print(f"[GenderCls] ⚠️ OpenCV 模型加载失败: {e}")
+            print(f"[GenderCls] OpenCV model load failed: {e}")
             print(f"[GenderCls] 将使用像素统计启发式分类器")
             self.model = None
 
@@ -298,7 +298,7 @@ def find_gender_direction(generator, classifier=None, num_samples=500,
     # ── 方案A: 仅演示用 (随机方向, 非真实性别控制) ──
     if use_known_direction:
         direction = _get_known_gender_direction(device)
-        print("[GenderDir] ⚠️ 使用近似方向 (仅用于演示, 非真实性别控制)")
+        print("[GenderDir] Using approximate direction (demo only)")
         return direction, {'method': 'known_approx', 'intercept': 0.0}
 
     # ── 方案B: SVM + OpenCV 性别分类器 ──
@@ -339,7 +339,7 @@ def find_gender_direction(generator, classifier=None, num_samples=500,
     print(f"[GenderDir] 有效样本: {len(all_w)} (女={n_female}, 男={n_male})")
 
     if min(n_female, n_male) < 5:
-        print("[GenderDir] ⚠️ 样本不均衡, 分类器可能未正常工作")
+        print("[GenderDir] Warning: imbalanced samples, classifier may be broken")
         print("[GenderDir] 请检查 OpenCV 性别模型是否正确下载")
 
     # 训练线性 SVM 找到性别超平面
@@ -352,7 +352,7 @@ def find_gender_direction(generator, classifier=None, num_samples=500,
     direction = direction.unsqueeze(0)  # [1, 512]
 
     accuracy = float(clf.score(all_w, all_labels))
-    print(f"[GenderDir] ✅ SVM 准确率: {accuracy:.2%}")
+    print(f"[GenderDir] SVM accuracy: {accuracy:.2%}")
     print(f"[GenderDir] ✅ 性别方向已计算 (L2归一化)")
 
     info = {
