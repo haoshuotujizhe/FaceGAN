@@ -4,8 +4,7 @@ weights/*.pt
 
 # Generated output
 outputs/
-figures/
-*.png
+
 
 # Python
 __pycache__/
