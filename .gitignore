@@ -1,0 +1,8 @@
+weights/*.pkl
+weights/*.pt
+__pycache__/
+.ipynb_checkpoints/
+*.png
+outputs/
+docs/
+.spec-workflow
