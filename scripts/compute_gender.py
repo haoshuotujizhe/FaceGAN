@@ -180,7 +180,7 @@ for i, a in enumerate(np.linspace(-4, 4, 9)):
     axes[i].set_title(f'{label} a={a:+.0f}', fontsize=10)
 os.makedirs('figures', exist_ok=True)
 plt.savefig('figures/gender_test_v3.png', bbox_inches='tight', pad_inches=0, dpi=200)
-print('✅ figures/gender_test_v3.png')
+print(' figures/gender_test_v3.png')
 
 # ─── 清理 checkpoint ───
 if os.path.exists(CACHE_DIR):
